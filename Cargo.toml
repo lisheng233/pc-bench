@@ -1,0 +1,23 @@
+[package]
+name = "pc_benchmark"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sysinfo = "0.30"
+num_cpus = "1.16"
+rand = "0.8"
+indicatif = "0.17"
+colored = "2.1"
+wgpu = "0.19"
+pollster = "0.3"
+futures = "0.3"
+tokio = { version = "1", features = ["full"] }
+rayon = "1.10"
+bytemuck = "1.14"
+twox-hash = "1.6"
+
+[profile.release]
+opt-level = 2
+strip=true
+lto = true
