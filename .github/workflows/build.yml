@@ -1,0 +1,60 @@
+name: Build and Release
+
+on:
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # 允许手动触发
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: pc_benchmark
+            asset_name: pc_benchmark-linux-x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: pc_benchmark.exe
+            asset_name: pc_benchmark-windows-x86_64.exe
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: pc_benchmark
+            asset_name: pc_benchmark-macos-x86_64
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            artifact_name: pc_benchmark
+            asset_name: pc_benchmark-linux-arm64
+          # 可选：Apple Silicon (M1/M2)
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: pc_benchmark
+            asset_name: pc_benchmark-macos-aarch64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Cache cargo registry and build
+      uses: swatinem/rust-cache@v2
+
+    - name: Build release binary
+      run: cargo run --release --target ${{ matrix.target }}
+
+    - name: Upload artifact (for non-tag pushes)
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.asset_name }}
+        path: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+ 
