@@ -121,7 +121,7 @@ fn test_integer_operations(num_threads: usize) -> (f64, f64) {
         total_ops as f64
     }, target_secs);
     let mops = mops_per_sec / 1_000_000.0;
-    let score = (mops / 100.0) * REFERENCE_SCORE; // 参考CPU 约1200 MOPS
+    let score = (mops / 246.0) * REFERENCE_SCORE; // 参考CPU 约1200 MOPS
     (score, mops)
 }
 
@@ -145,7 +145,7 @@ fn test_floating_point_operations(num_threads: usize) -> (f64, f64) {
         total_flops
     }, target_secs);
     let mflops = mflops_per_sec / 1_000_000.0;
-    let score = (mflops / 40.0) * REFERENCE_SCORE; // 参考CPU 约800 MFLOPS
+    let score = (mflops / 62.0) * REFERENCE_SCORE; // 参考CPU 约800 MFLOPS
     (score, mflops)
 }
 
@@ -167,7 +167,7 @@ fn test_prime_counting(_num_threads: usize) -> (f64, f64) {
         count
     }, target_secs);
     let kprimes = primes_per_sec / 1000.0;
-    let score = (kprimes / 4000.0) * REFERENCE_SCORE; // 参考CPU ~350 kPrimes/s
+    let score = (kprimes / 6222.0) * REFERENCE_SCORE; // 参考CPU ~350 kPrimes/s
     (score, kprimes)
 }
 
@@ -199,7 +199,7 @@ fn test_matrix_multiplication(num_threads: usize) -> (f64, f64) {
         total_flops
     }, target_secs);
     let gflops = gflops_per_sec / 1_000_000_000.0;
-    let score = (gflops / 1.0) * REFERENCE_SCORE; // 参考CPU ~50 GFLOPS
+    let score = (gflops / 4.7) * REFERENCE_SCORE; // 参考CPU ~50 GFLOPS
     (score, gflops)
 }
 
@@ -222,6 +222,6 @@ fn test_hash_throughput(num_threads: usize) -> (f64, f64) {
         total_hashes
     }, target_secs);
     let mhash = hashes_per_sec / 1_000_000.0;
-    let score = (mhash / 20.0) * REFERENCE_SCORE; // 参考CPU ~25 MHash/s
+    let score = (mhash / 25.0) * REFERENCE_SCORE; // 参考CPU ~25 MHash/s
     (score, mhash)
 }
