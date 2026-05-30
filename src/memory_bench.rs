@@ -1,0 +1,173 @@
+// memory_bench.rs
+use std::time::Instant;
+use std::alloc::{alloc, dealloc, Layout};
+use rand::Rng;
+use indicatif::{ProgressBar, ProgressStyle};
+use colored::*;
+
+pub fn run_memory_benchmark(total_ram: u64) -> f64 {
+    let ram_gb = total_ram as f64 / 1024.0 / 1024.0 / 1024.0;
+    println!("  Total RAM: {:.2} GB", ram_gb);
+    
+    let pb = ProgressBar::new(4);
+    pb.set_style(ProgressStyle::default_bar()
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+        .unwrap()
+        .progress_chars("#>-"));
+    
+    let mut scores = Vec::new();
+    
+    // 测试1: 顺序读写
+    pb.set_message("Sequential read/write...");
+    let score1 = test_sequential_access();
+    scores.push(score1);
+    pb.inc(1);
+    
+    // 测试2: 随机读写
+    pb.set_message("Random read/write...");
+    let score2 = test_random_access();
+    scores.push(score2);
+    pb.inc(1);
+    
+    // 测试3: 内存带宽
+    pb.set_message("Memory bandwidth...");
+    let score3 = test_memory_bandwidth();
+    scores.push(score3);
+    pb.inc(1);
+    
+    // 测试4: 延迟测试
+    pb.set_message("Latency test...");
+    let score4 = test_latency();
+    scores.push(score4);
+    pb.inc(1);
+    
+    pb.finish_with_message("Memory benchmark complete!");
+    
+    println!("Sequential read/write : {:.2}",score1);
+    println!("Random read/write : {:.2}",score2);
+    println!("Memory bandwidth : {:.2}",score3);
+    println!("Latency test : {:.2}",score4);
+    let avg_score = scores.iter().sum::<f64>() / scores.len() as f64;
+    
+    println!("  {}: {:.2}", "Memory Score".bright_green(), avg_score);
+    
+    avg_score
+}
+
+fn test_sequential_access() -> f64 {
+    let size = 100_000_000; // 100M elements
+    let layout = Layout::array::<u64>(size).unwrap();
+    let ptr = unsafe { alloc(layout) as *mut u64 };
+    
+    let start = Instant::now();
+    
+    // 顺序写入
+    unsafe {
+        for i in 0..size {
+            *ptr.add(i) = i as u64;
+        }
+    }
+    
+    // 顺序读取并计算
+    let mut sum: u64 = 0;
+    unsafe {
+        for i in 0..size {
+            sum = sum.wrapping_add(*ptr.add(i));
+        }
+    }
+    
+    std::hint::black_box(sum);
+    
+    let elapsed = start.elapsed().as_secs_f64();
+    let bandwidth = (size * std::mem::size_of::<u64>() * 2) as f64 / elapsed / 1_000_000_000.0;
+    
+    unsafe { dealloc(ptr as *mut u8, layout); }
+    
+    bandwidth * 100.0
+}
+
+fn test_random_access() -> f64 {
+    let size = 10_000_000;
+    let mut data: Vec<usize> = (0..size).collect();
+    // 随机打乱，形成随机链表
+    use rand::seq::SliceRandom;
+    let mut rng = rand::thread_rng();
+    data.shuffle(&mut rng);
+    // 最后元素指向第一个
+    let start = data[0];
+    
+    let start_time = Instant::now();
+    let mut current = start;
+    let mut sum = 0usize;
+    for _ in 0..5_000_000 {
+        current = data[current];
+        sum += current;
+    }
+    std::hint::black_box(sum);
+    let elapsed = start_time.elapsed().as_secs_f64();
+    let ops_per_sec = 5_000_000.0 / elapsed;
+    // 归一化得分：以 10 M ops/s 为 1000 分
+    ops_per_sec / 10_000.0
+}
+
+fn test_memory_bandwidth() -> f64 {
+    let size = 50_000_000; // 50M u64 = 400MB
+    let mut src = vec![0u64; size];
+    let mut dst = vec![0u64; size];
+    
+    // 初始化源数据
+    for i in 0..size {
+        src[i] = i as u64;
+    }
+    
+    let start = Instant::now();
+    
+    // 复制操作（memcpy）
+    for _ in 0..5 {
+        dst.copy_from_slice(&src);
+    }
+    
+    let elapsed = start.elapsed().as_secs_f64();
+    let total_bytes = (size * std::mem::size_of::<u64>() * 5) as f64;
+    let bandwidth = total_bytes / elapsed / 1_000_000_000.0;
+    
+    std::hint::black_box(&dst);
+    
+    bandwidth * 200.0
+}
+
+fn test_latency() -> f64 {
+    // 创建链表结构测试内存延迟
+    let size = 10_000_000;
+    let mut data: Vec<(u64, usize)> = vec![(0, 0); size];
+    
+    // 创建随机链表
+    let mut order: Vec<usize> = (0..size).collect();
+    // Fisher-Yates shuffle
+    for i in (1..size).rev() {
+        let j = rand::thread_rng().gen_range(0..=i);
+        order.swap(i, j);
+    }
+    
+    for i in 0..size {
+        let next = if i < size - 1 { order[i + 1] } else { order[0] };
+        data[order[i]] = (0, next);
+    }
+    
+    let start = Instant::now();
+    
+    let mut current = order[0];
+    let mut sum: u64 = 0;
+    for _ in 0..5_000_000 {
+        sum = sum.wrapping_add(data[current].0);
+        current = data[current].1;
+    }
+    
+    std::hint::black_box(sum);
+    
+    let elapsed = start.elapsed().as_secs_f64();
+    let latency_ns = elapsed * 1_000_000_000.0 / 5_000_000.0;
+    
+    // 延迟越低得分越高
+    (1000.0 / latency_ns) * 500.0
+}
