@@ -1,14 +1,11 @@
-// cpu_bench.rs
 use rayon::prelude::*;
 use std::time::Instant;
 use rand::Rng;
 use indicatif::{ProgressBar, ProgressStyle};
 use colored::*;
+use crate::config::CpuConfig;
 
-// 参考 CPU: Intel i5-11400 (6核12线程) 在该测试下的基准分数设为 10000
-const REFERENCE_SCORE: f64 = 10000.0;
-
-pub fn run_cpu_benchmark() -> f64 {
+pub fn run_cpu_benchmark(config: &CpuConfig) -> f64 {
     let num_threads = num_cpus::get();
     println!("  CPU Cores: {}", num_threads);
 
@@ -21,37 +18,32 @@ pub fn run_cpu_benchmark() -> f64 {
     let mut scores = Vec::new();
     let mut raw_performance = Vec::new();
 
-    // 测试1: 整数运算 (MOPS)
     pb.set_message("Integer operations...");
-    let (score1, mops) = test_integer_operations(num_threads);
+    let (score1, mops) = test_integer_operations(num_threads, config);
     scores.push(score1);
     raw_performance.push(format!("{:.0} MOPS", mops));
     pb.inc(1);
 
-    // 测试2: 浮点运算 (MFLOPS)
     pb.set_message("Floating point operations...");
-    let (score2, mflops) = test_floating_point_operations(num_threads);
+    let (score2, mflops) = test_floating_point_operations(num_threads, config);
     scores.push(score2);
     raw_performance.push(format!("{:.0} MFLOPS", mflops));
     pb.inc(1);
 
-    // 测试3: 质数计数 (kPrimes/s)
     pb.set_message("Prime counting...");
-    let (score3, kprimes) = test_prime_counting(num_threads);
+    let (score3, kprimes) = test_prime_counting(num_threads, config);
     scores.push(score3);
     raw_performance.push(format!("{:.2} kPrimes/s", kprimes));
     pb.inc(1);
 
-    // 测试4: 矩阵乘法 (GFLOPS)
     pb.set_message("Matrix multiplication...");
-    let (score4, gflops) = test_matrix_multiplication(num_threads);
+    let (score4, gflops) = test_matrix_multiplication(num_threads, config);
     scores.push(score4);
     raw_performance.push(format!("{:.2} GFLOPS", gflops));
     pb.inc(1);
 
-    // 测试5: 哈希吞吐 (MHash/s)
     pb.set_message("Hash throughput...");
-    let (score5, mhash) = test_hash_throughput(num_threads);
+    let (score5, mhash) = test_hash_throughput(num_threads, config);
     scores.push(score5);
     raw_performance.push(format!("{:.2} MHash/s", mhash));
     pb.inc(1);
@@ -72,9 +64,9 @@ pub fn run_cpu_benchmark() -> f64 {
 /// 自适应执行，确保每个测试运行约 1.5 秒
 fn run_with_adaptive_time<F>(mut f: F, target_secs: f64) -> f64
 where
-    F: FnMut(u64) -> f64,   // 参数是迭代次数，返回总操作数或事件数
+    F: FnMut(u64) -> f64,
 {
-    let warmup = 2;          // 预热次数
+    let warmup = 2;
     for _ in 0..warmup {
         f(10_000);
     }
@@ -82,7 +74,6 @@ where
     let mut iter = 10_000;
     let mut elapsed = 0.0;
     let mut result = 0.0;
-    // 粗调
     for _ in 0..5 {
         let start = Instant::now();
         result = f(iter);
@@ -92,7 +83,6 @@ where
         }
         iter = (iter as f64 * (target_secs / elapsed).clamp(1.2, 10.0)) as u64;
     }
-    // 细调
     let target = target_secs;
     if elapsed > target * 0.8 && elapsed < target * 1.2 {
         return result / elapsed;
@@ -100,15 +90,14 @@ where
     let adjusted = (iter as f64 * (target / elapsed)) as u64;
     let start = Instant::now();
     let result = f(adjusted);
-    elapsed = start.elapsed().as_secs_f64();
+    let elapsed = start.elapsed().as_secs_f64();
     result / elapsed
 }
 
-// ---------- 整数运算 ----------
-fn test_integer_operations(num_threads: usize) -> (f64, f64) {
+fn test_integer_operations(num_threads: usize, config: &CpuConfig) -> (f64, f64) {
     let target_secs = 1.5;
     let mops_per_sec = run_with_adaptive_time(|iter| {
-        let total_ops = iter as u64 * 3; // 每次循环三指令
+        let total_ops = iter as u64 * 3;
         (0..num_threads * 2).into_par_iter().for_each(|_| {
             let mut sum: i64 = 0;
             for i in 0..iter {
@@ -121,17 +110,15 @@ fn test_integer_operations(num_threads: usize) -> (f64, f64) {
         total_ops as f64
     }, target_secs);
     let mops = mops_per_sec / 1_000_000.0;
-    let score = (mops / 246.0) * REFERENCE_SCORE; // 参考CPU 约1200 MOPS
+    let score = (mops / config.integer_ref) * config.reference_score;
     (score, mops)
 }
 
-// ---------- 浮点运算 (预生成随机数组) ----------
-fn test_floating_point_operations(num_threads: usize) -> (f64, f64) {
+fn test_floating_point_operations(num_threads: usize, config: &CpuConfig) -> (f64, f64) {
     let target_secs = 1.5;
-    // 预先生成足够大的随机数组，避免 rand 开销
     let rng_buf: Vec<f64> = (0..10_000_000).map(|_| rand::thread_rng().gen()).collect();
     let mflops_per_sec = run_with_adaptive_time(|iter| {
-        let total_flops = iter as f64 * 6.0; // sin+cos, sqrt, ln+exp 约6 FLOP
+        let total_flops = iter as f64 * 6.0;
         (0..num_threads * 2).into_par_iter().for_each(|_| {
             let mut result = 0.0;
             for i in 0..iter {
@@ -145,12 +132,11 @@ fn test_floating_point_operations(num_threads: usize) -> (f64, f64) {
         total_flops
     }, target_secs);
     let mflops = mflops_per_sec / 1_000_000.0;
-    let score = (mflops / 62.0) * REFERENCE_SCORE; // 参考CPU 约800 MFLOPS
+    let score = (mflops / config.float_ref) * config.reference_score;
     (score, mflops)
 }
 
-// ---------- 质数计数 (Eratosthenes 分段筛，评估整数吞吐) ----------
-fn test_prime_counting(_num_threads: usize) -> (f64, f64) {
+fn test_prime_counting(_num_threads: usize, config: &CpuConfig) -> (f64, f64) {
     let target_secs = 1.5;
     let primes_per_sec = run_with_adaptive_time(|limit| {
         let limit = limit as usize;
@@ -163,22 +149,19 @@ fn test_prime_counting(_num_threads: usize) -> (f64, f64) {
                 }
             }
         }
-        let count = (2..=limit).filter(|&x| is_prime[x]).count() as f64;
-        count
+        (2..=limit).filter(|&x| is_prime[x]).count() as f64
     }, target_secs);
     let kprimes = primes_per_sec / 1000.0;
-    let score = (kprimes / 6222.0) * REFERENCE_SCORE; // 参考CPU ~350 kPrimes/s
+    let score = (kprimes / config.prime_ref) * config.reference_score;
     (score, kprimes)
 }
 
-// ---------- 矩阵乘法 (连续内存，优化循环顺序) ----------
-fn test_matrix_multiplication(num_threads: usize) -> (f64, f64) {
+fn test_matrix_multiplication(num_threads: usize, config: &CpuConfig) -> (f64, f64) {
     let target_secs = 1.5;
-    let size = 512; // 固定大小 512x512，现代CPU可快速完成
-    let total_flops = 2.0 * size as f64 * size as f64 * size as f64; // 乘法+加法每个元素
-    
+    let size = 512;
+    let total_flops = 2.0 * size as f64 * size as f64 * size as f64;
+
     let gflops_per_sec = run_with_adaptive_time(|_| {
-        // 多次运行矩阵乘法直至时间达标，这里利用 run_with_adaptive_time 的重复调用特性
         let matrix_a = vec![1.0f64; size * size];
         let matrix_b = vec![2.0f64; size * size];
         let result = vec![0.0f64; size * size];
@@ -199,14 +182,13 @@ fn test_matrix_multiplication(num_threads: usize) -> (f64, f64) {
         total_flops
     }, target_secs);
     let gflops = gflops_per_sec / 1_000_000_000.0;
-    let score = (gflops / 4.7) * REFERENCE_SCORE; // 参考CPU ~50 GFLOPS
+    let score = (gflops / config.matrix_ref) * config.reference_score;
     (score, gflops)
 }
 
-// ---------- 哈希吞吐 (fxhash 更快，避免 SipHash 过慢) ----------
-fn test_hash_throughput(num_threads: usize) -> (f64, f64) {
+fn test_hash_throughput(num_threads: usize, config: &CpuConfig) -> (f64, f64) {
     use std::hash::Hasher;
-    use twox_hash::XxHash64; // 需要添加依赖 twox-hash
+    use twox_hash::XxHash64;
 
     let target_secs = 1.5;
     let hashes_per_sec = run_with_adaptive_time(|iter| {
@@ -222,6 +204,6 @@ fn test_hash_throughput(num_threads: usize) -> (f64, f64) {
         total_hashes
     }, target_secs);
     let mhash = hashes_per_sec / 1_000_000.0;
-    let score = (mhash / 25.0) * REFERENCE_SCORE; // 参考CPU ~25 MHash/s
+    let score = (mhash / config.hash_ref) * config.reference_score;
     (score, mhash)
 }

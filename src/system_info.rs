@@ -18,7 +18,7 @@ pub fn get_system_info() -> SystemInfo {
         .map(|cpu| cpu.brand().to_string())
         .unwrap_or_else(|| "Unknown CPU".to_string());
     
-    let cpu_cores = sys.cpus().len();
+    let cpu_cores = sys.cpus().len().max(num_cpus::get());
     let total_ram = sys.total_memory();
     let os_name = System::name().unwrap_or_else(|| "Unknown OS".to_string());
     let kernel_version = System::kernel_version().unwrap_or_else(|| "Unknown".to_string());
