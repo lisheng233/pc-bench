@@ -1,0 +1,35 @@
+[scoring]
+cpu_weight = 0.4
+memory_weight = 0.3
+storage_weight = 0.2
+gpu_weight = 0.1
+
+[cpu]
+integer_ref = 246.0
+float_ref = 62.0
+prime_ref = 6222.77
+matrix_ref = 4.79
+hash_ref = 24.02
+reference_score = 10000.0
+
+[memory]
+reference_score = 10000.0
+
+[storage]
+reference_score = 10000.0
+
+[gpu]
+reference_score = 10000.0
+
+[rating]
+excellent = 10000.0
+very_good = 7000.0
+good = 5000.0
+average = 3000.0
+
+[rating.labels]
+excellent = "Excellent"
+very_good = "Very Good"
+good = "Good"
+average = "Average"
+below_average = "Below Average"
