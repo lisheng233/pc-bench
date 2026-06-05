@@ -57,8 +57,12 @@ pub fn run_cpu_benchmark(config: &CpuConfig) -> f64 {
     println!("  Hash throughput       : {}  →  {:.2}", raw_performance[4].bright_white(), scores[4]);
 
     let avg_score = scores.iter().sum::<f64>() / scores.len() as f64;
-    println!("  {}: {:.2}", "CPU Score".bright_green(), avg_score);
-    avg_score
+    println!("  {}: {:.2}", "Average CPU Score".bright_green(), avg_score);
+    if config.calc_average_cpu_score {
+        avg_score
+    } else {
+        avg_score * ((num_threads / config.num_threads_ref) as f64)
+    }
 }
 
 /// 自适应执行，确保每个测试运行约 1.5 秒

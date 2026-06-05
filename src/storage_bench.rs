@@ -7,7 +7,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use colored::*;
 use crate::config::StorageConfig;
 
-pub async fn run_storage_benchmark(_config: &StorageConfig) -> f64 {
+pub async fn run_storage_benchmark(config: &StorageConfig) -> f64 {
     let pb = ProgressBar::new(4);
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
@@ -18,22 +18,22 @@ pub async fn run_storage_benchmark(_config: &StorageConfig) -> f64 {
     let mut scores = Vec::new();
     
     pb.set_message("Sequential write...");
-    let score1 = test_sequential_write(&test_file);
+    let score1 = test_sequential_write(&test_file,&config);
     scores.push(score1);
     pb.inc(1);
     
     pb.set_message("Sequential read...");
-    let score2 = test_sequential_read(&test_file);
+    let score2 = test_sequential_read(&test_file,&config);
     scores.push(score2);
     pb.inc(1);
     
     pb.set_message("Random write...");
-    let score3 = test_random_write(&test_file);
+    let score3 = test_random_write(&test_file,&config);
     scores.push(score3);
     pb.inc(1);
     
     pb.set_message("Random read...");
-    let score4 = test_random_read(&test_file);
+    let score4 = test_random_read(&test_file,&config);
     scores.push(score4);
     pb.inc(1);
     
@@ -49,7 +49,7 @@ pub async fn run_storage_benchmark(_config: &StorageConfig) -> f64 {
     avg_score
 }
 
-fn test_sequential_write(file_path: &PathBuf) -> f64 {
+fn test_sequential_write(file_path: &PathBuf,config:&StorageConfig) -> f64 {
     let size = 500_000_000;
     let buffer = vec![0u8; 1_000_000];
     let mut file = File::create(file_path).unwrap();
@@ -60,10 +60,10 @@ fn test_sequential_write(file_path: &PathBuf) -> f64 {
     file.sync_all().unwrap();
     let elapsed = start.elapsed().as_secs_f64();
     let speed = size as f64 / elapsed / 1_000_000.0;
-    speed * 2.0
+    speed / config.sequential_write_ref
 }
 
-fn test_sequential_read(file_path: &PathBuf) -> f64 {
+fn test_sequential_read(file_path: &PathBuf,config:&StorageConfig) -> f64 {
     let mut file = File::open(file_path).unwrap();
     let mut buffer = vec![0u8; 1_000_000];
     let start = Instant::now();
@@ -77,10 +77,10 @@ fn test_sequential_read(file_path: &PathBuf) -> f64 {
     let elapsed = start.elapsed().as_secs_f64();
     let file_size = file.metadata().unwrap().len() as f64;
     let speed = file_size / elapsed / 1_000_000.0;
-    speed * 2.0
+    speed /config.sequential_read_ref
 }
 
-fn test_random_write(file_path: &PathBuf) -> f64 {
+fn test_random_write(file_path: &PathBuf,config:&StorageConfig) -> f64 {
     let mut file = std::fs::OpenOptions::new()
         .write(true)
         .open(file_path)
@@ -99,10 +99,10 @@ fn test_random_write(file_path: &PathBuf) -> f64 {
     file.sync_all().unwrap();
     let elapsed = start.elapsed().as_secs_f64();
     let iops = num_operations as f64 / elapsed;
-    iops / 20.0
+    iops / config.random_write_ref
 }
 
-fn test_random_read(file_path: &PathBuf) -> f64 {
+fn test_random_read(file_path: &PathBuf,config:&StorageConfig) -> f64 {
     let mut file = File::open(file_path).unwrap();
     let file_size = file.metadata().unwrap().len();
     let block_size = 4096;
@@ -117,5 +117,5 @@ fn test_random_read(file_path: &PathBuf) -> f64 {
     }
     let elapsed = start.elapsed().as_secs_f64();
     let iops = num_operations as f64 / elapsed;
-    iops / 100.0
+    iops / config.random_read_ref
 }

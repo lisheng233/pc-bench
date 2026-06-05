@@ -5,7 +5,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use colored::*;
 use crate::config::MemoryConfig;
 
-pub fn run_memory_benchmark(total_ram: u64, _config: &MemoryConfig) -> f64 {
+pub fn run_memory_benchmark(total_ram: u64, config: &MemoryConfig) -> f64 {
     let ram_gb = total_ram as f64 / 1024.0 / 1024.0 / 1024.0;
     println!("  Total RAM: {:.2} GB", ram_gb);
     
@@ -18,22 +18,22 @@ pub fn run_memory_benchmark(total_ram: u64, _config: &MemoryConfig) -> f64 {
     let mut scores = Vec::new();
     
     pb.set_message("Sequential read/write...");
-    let score1 = test_sequential_access();
+    let score1 = test_sequential_access(&config);
     scores.push(score1);
     pb.inc(1);
     
     pb.set_message("Random read/write...");
-    let score2 = test_random_access();
+    let score2 = test_random_access(&config);
     scores.push(score2);
     pb.inc(1);
     
     pb.set_message("Memory bandwidth...");
-    let score3 = test_memory_bandwidth();
+    let score3 = test_memory_bandwidth(&config);
     scores.push(score3);
     pb.inc(1);
     
     pb.set_message("Latency test...");
-    let score4 = test_latency();
+    let score4 = test_latency(&config);
     scores.push(score4);
     pb.inc(1);
     
@@ -49,8 +49,8 @@ pub fn run_memory_benchmark(total_ram: u64, _config: &MemoryConfig) -> f64 {
     avg_score
 }
 
-fn test_sequential_access() -> f64 {
-    let size = 100_000_000;
+fn test_sequential_access(config:&MemoryConfig) -> f64 {
+    let size = config.sequential_access_test_size;
     let layout = Layout::array::<u64>(size).unwrap();
     let ptr = unsafe { alloc(layout) as *mut u64 };
     
@@ -70,11 +70,11 @@ fn test_sequential_access() -> f64 {
     let elapsed = start.elapsed().as_secs_f64();
     let bandwidth = (size * std::mem::size_of::<u64>() * 2) as f64 / elapsed / 1_000_000_000.0;
     unsafe { dealloc(ptr as *mut u8, layout); }
-    bandwidth * 100.0
+    bandwidth / config.sequential_access_ref
 }
 
-fn test_random_access() -> f64 {
-    let size = 10_000_000;
+fn test_random_access(config: &MemoryConfig) -> f64 {
+    let size = config.random_access_test_size;
     let layout = Layout::array::<u64>(size).unwrap();
     let ptr = unsafe { alloc(layout) as *mut u64 };
     unsafe {
@@ -98,11 +98,11 @@ fn test_random_access() -> f64 {
     let elapsed = start.elapsed().as_secs_f64();
     let ops_per_sec = indices.len() as f64 / elapsed;
     unsafe { dealloc(ptr as *mut u8, layout); }
-    ops_per_sec / 1_000_000.0 * 100.0
+    ops_per_sec / 1_000_000.0 / config.random_access_ref
 }
 
-fn test_memory_bandwidth() -> f64 {
-    let size = 50_000_000;
+fn test_memory_bandwidth(config:&MemoryConfig) -> f64 {
+    let size = config.memory_bandwidth_test_size;
     let mut src = vec![0u64; size];
     let mut dst = vec![0u64; size];
     for i in 0..size {
@@ -116,11 +116,11 @@ fn test_memory_bandwidth() -> f64 {
     let total_bytes = (size * std::mem::size_of::<u64>() * 5) as f64;
     let bandwidth = total_bytes / elapsed / 1_000_000_000.0;
     std::hint::black_box(&dst);
-    bandwidth * 50.0
+    bandwidth / config.memory_bandwidth_ref
 }
 
-fn test_latency() -> f64 {
-    let size = 10_000_000;
+fn test_latency(config: &MemoryConfig) -> f64 {
+    let size = config.latency_test_size;
     let mut data: Vec<(u64, usize)> = vec![(0, 0); size];
     let mut order: Vec<usize> = (0..size).collect();
     for i in (1..size).rev() {
@@ -141,5 +141,5 @@ fn test_latency() -> f64 {
     std::hint::black_box(sum);
     let elapsed = start.elapsed().as_secs_f64();
     let latency_ns = elapsed * 1_000_000_000.0 / 5_000_000.0;
-    (1000.0 / latency_ns) * 500.0
+    (1000.0 / latency_ns) / config.latency_ref
 }
