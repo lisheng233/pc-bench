@@ -1,25 +1,43 @@
 [scoring]
-cpu_weight = 0.4
-memory_weight = 0.3
+cpu_weight = 0.5
+memory_weight = 0.2
 storage_weight = 0.2
 gpu_weight = 0.1
 
 [cpu]
-integer_ref = 246.0
-float_ref = 62.0
-prime_ref = 6222.77
-matrix_ref = 4.79
-hash_ref = 24.02
+calc_average_cpu_score = true
+num_threads_ref = 4
+integer_ref = 240.0
+float_ref = 60.0
+prime_ref = 6000.0
+matrix_ref = 4.0
+hash_ref = 24.0
 reference_score = 10000.0
 
 [memory]
-reference_score = 10000.0
+sequential_access_ref = 0.004
+sequential_access_test_size = 100000000
+random_access_ref = 0.01
+random_access_test_size = 10000000
+memory_bandwidth_ref = 0.005
+memory_bandwidth_test_size = 50000000
+latency_ref = 0.002
+latency_test_size = 10000000
 
 [storage]
-reference_score = 10000.0
+sequential_write_ref = 0.2
+sequential_read_ref = 0.8
+random_write_ref = 10.0
+random_read_ref = 100.0
 
 [gpu]
+force_test_vgpu = false
 reference_score = 10000.0
+iteration = 64
+vec_ref = 5000.0
+vram_bandwidth_ref = 200.0
+vram_bandwidth_test_size_mb = 128
+vram_capacity_weight = 0.3
 
 [rating]
 excellent = 10000.0
