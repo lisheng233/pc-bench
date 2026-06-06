@@ -4,27 +4,67 @@ use wgpu::util::DeviceExt;
 use crate::config::GpuConfig;
 
 pub async fn run_gpu_benchmark(config: &GpuConfig) -> f64 {
-    println!("  Checking GPU availability...");
+    println!("  Enumerating GPUs...");
 
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::all(),
         ..Default::default()
     });
 
-    let adapter = match instance
-        .request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            compatible_surface: None,
-            force_fallback_adapter: false,
-        })
-        .await
-    {
-        Some(adapter) => adapter,
-        None => {
-            println!("  {} No GPU adapter found", "⚠".bright_yellow());
-            return 0.0;
+    let adapters = instance.enumerate_adapters(wgpu::Backends::all());
+    if adapters.is_empty() {
+        println!("  {} No GPU adapter found", "⚠".bright_yellow());
+        return 0.0;
+    }
+
+    println!("  Found {} GPU(s)", adapters.len());
+
+    let mut total_score = 0.0;
+    let mut gpu_count = 0;
+
+    for (idx, adapter) in adapters.iter().enumerate() {
+        println!("\n  --- GPU #{} ---", idx + 1);
+        if let Some(score) = run_benchmark_on_adapter(adapter, config).await {
+            total_score += score;
+            gpu_count += 1;
         }
-    };
+    }
+
+    if gpu_count == 0 {
+        println!("  {} No usable GPU found", "⚠".bright_yellow());
+        return 0.0;
+    }
+
+    println!("\n  {} (sum of {}) = {:.2}", "Multi-GPU Total Score".bright_blue(), gpu_count, total_score);
+    total_score
+}
+
+/// 在单个适配器上运行完整的 GPU 基准测试，返回该 GPU 的分数（若失败则返回 None）
+async fn run_benchmark_on_adapter(adapter: &wgpu::Adapter, config: &GpuConfig) -> Option<f64> {
+    let info = adapter.get_info();
+    let is_software = info.name.to_lowercase().contains("llvmpipe")
+        || info.name.to_lowercase().contains("software")
+        || info.name.to_lowercase().contains("basic render");
+
+    if is_software {
+        if config.force_test_vgpu {
+            println!(
+                "  {} Software renderer detected ({}). \n  Forcing running GPU benchmark\n    (this will be extremely slow and may cause some faults!!!).",
+                "⚠".bright_yellow(),
+                info.name
+            );
+        } else {
+            println!(
+                "  {} Software renderer detected ({}). Skipping this GPU.",
+                "⚠".bright_yellow(),
+                info.name
+            );
+            return None;
+        }
+    }
+
+    println!("  GPU: {}", info.name.bright_cyan());
+    println!("  Backend: {:?}", info.backend);
 
     let (device, queue) = match adapter
         .request_device(
@@ -41,29 +81,9 @@ pub async fn run_gpu_benchmark(config: &GpuConfig) -> f64 {
         Ok((device, queue)) => (device, queue),
         Err(_) => {
             println!("  {} Failed to create GPU device", "⚠".bright_yellow());
-            return 0.0;
+            return None;
         }
     };
-
-    let info = adapter.get_info();
-    let is_software = info.name.to_lowercase().contains("llvmpipe")
-        || info.name.to_lowercase().contains("software")
-        || info.name.to_lowercase().contains("basic render");
-    if is_software {
-        if config.force_test_vgpu{
-            println!(
-            "  {} Software renderer detected ({}). \n  Forcing running GPU benchmark\n    (this will be extremely slow and may cause some faults!!!).","⚠".bright_yellow(),
-                info.name)
-        } else {
-            println!(
-            "  {} Software renderer detected ({}). Skipping GPU benchmark.","⚠".bright_yellow(),
-                info.name);
-            return 0.0;
-            }
-    }
-
-    println!("  GPU: {}", info.name.bright_cyan());
-    println!("  Backend: {:?}", info.backend);
 
     // 1. 显存带宽测试
     let bandwidth_gbps = measure_vram_bandwidth(&device, &queue, config).await;
@@ -80,9 +100,9 @@ pub async fn run_gpu_benchmark(config: &GpuConfig) -> f64 {
     let gpu_total_score = compute_score * compute_weight + bandwidth_score * vram_bw_weight;
 
     println!("  GPU Compute Score: {:.2}", compute_score);
-    println!("  {}: {:.2}", "GPU Total Score".bright_blue(), gpu_total_score);
+    println!("  {}: {:.2}", "GPU Score".bright_blue(), gpu_total_score);
 
-    gpu_total_score
+    Some(gpu_total_score)
 }
 
 /// 显存带宽测试 (GB/s)
