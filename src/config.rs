@@ -38,23 +38,46 @@ pub struct CpuConfig {
 /// 内存基准配置
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MemoryConfig {
-    pub sequential_access_ref:f64,
-    pub sequential_access_test_size:usize,
-    pub random_access_ref:f64,
-    pub random_access_test_size:usize,
-    pub memory_bandwidth_ref:f64,
-    pub memory_bandwidth_test_size:usize,
-    pub latency_ref:f64,
-    pub latency_test_size:usize,
+    // 顺序读写测试配置
+    pub sequential_access_ref: f64,
+    pub sequential_access_test_size: usize,      // 测试元素数量 (u64)
+    
+    // 随机读写测试配置
+    pub random_access_ref: f64,
+    pub random_access_test_size: usize,          // 测试数组大小
+    pub random_access_operations: usize,         // 随机操作次数
+    
+    // 内存带宽测试配置
+    pub memory_bandwidth_ref: f64,
+    pub memory_bandwidth_test_size: usize,       // 测试数组大小 (u64)
+    pub memory_bandwidth_iterations: usize,      // 复制迭代次数
+    
+    // 延迟测试配置
+    pub latency_ref: f64,
+    pub latency_test_size: usize,                // 链表大小
+    pub latency_operations: usize,               // 遍历次数
 }
 
 /// 存储基准配置
 #[derive(Debug, Deserialize, Serialize)]
 pub struct StorageConfig {
-    pub sequential_write_ref:f64,
-    pub sequential_read_ref : f64,
-    pub random_write_ref:f64,
-    pub random_read_ref:f64,
+    // 顺序写入配置
+    pub sequential_write_ref: f64,
+    pub sequential_write_size: usize,      // 测试文件大小
+    pub sequential_write_buffer_size: usize,    // 写入缓冲区大小
+    
+    // 顺序读取配置
+    pub sequential_read_ref: f64,
+    
+    // 随机写入配置
+    pub random_write_ref: f64,
+    pub random_write_block_size: usize,       // 块大小 (字节)
+    pub random_write_operations: usize,       // 操作次数
+    
+    // 随机读取配置
+    pub random_read_ref: f64,
+    pub random_read_block_size: usize,        // 块大小 (字节)
+    pub random_read_operations: usize,        // 操作次数
 }
 
 /// GPU 基准配置
@@ -131,24 +154,40 @@ impl Default for CpuConfig {
 impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
-        sequential_access_ref:0.004,
-        sequential_access_test_size:100_000_000,
-        random_access_ref:0.01,
-        random_access_test_size:10_000_000,
-        memory_bandwidth_ref:0.005,
-        memory_bandwidth_test_size:50_000_000,
-        latency_ref:0.002,
-        latency_test_size:10_000_000,
-    }
+            sequential_access_ref: 0.004,
+            sequential_access_test_size: 100_000_000,    // 100M 个 u64 = 800 MB
+            
+            random_access_ref: 0.01,
+            random_access_test_size: 10_000_000,         // 10M 个 u64 = 80 MB
+            random_access_operations: 1_000_000,         // 100 万次操作
+            
+            memory_bandwidth_ref: 0.005,
+            memory_bandwidth_test_size: 50_000_000,      // 50M 个 u64 = 400 MB
+            memory_bandwidth_iterations: 5,              // 复制 5 次
+            
+            latency_ref: 0.002,
+            latency_test_size: 10_000_000,               // 10M 链表节点
+            latency_operations: 5_000_000,               // 遍历 500 万次
+        }
     }
 }
 
 impl Default for StorageConfig {
     fn default() -> Self {
-        Self { sequential_write_ref:0.2,
-            sequential_read_ref:0.8,
-            random_write_ref:10.0,
-            random_read_ref:100.0
+        Self {
+            sequential_write_ref: 0.2,
+            sequential_write_size: 500_000_000,
+            sequential_write_buffer_size: 1024000,
+            
+            sequential_read_ref: 0.8,
+            
+            random_write_ref: 10.0,
+            random_write_block_size: 4096,    // 4 KB 块
+            random_write_operations: 10000,   // 1 万次操作
+            
+            random_read_ref: 100.0,
+            random_read_block_size: 4096,     // 4 KB 块
+            random_read_operations: 10000,    // 1 万次操作
         }
     }
 }

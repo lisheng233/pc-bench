@@ -18,22 +18,22 @@ pub async fn run_storage_benchmark(config: &StorageConfig) -> f64 {
     let mut scores = Vec::new();
     
     pb.set_message("Sequential write...");
-    let score1 = test_sequential_write(&test_file,&config);
+    let score1 = test_sequential_write(&test_file, config);
     scores.push(score1);
     pb.inc(1);
     
     pb.set_message("Sequential read...");
-    let score2 = test_sequential_read(&test_file,&config);
+    let score2 = test_sequential_read(&test_file, config);
     scores.push(score2);
     pb.inc(1);
     
     pb.set_message("Random write...");
-    let score3 = test_random_write(&test_file,&config);
+    let score3 = test_random_write(&test_file, config);
     scores.push(score3);
     pb.inc(1);
     
     pb.set_message("Random read...");
-    let score4 = test_random_read(&test_file,&config);
+    let score4 = test_random_read(&test_file, config);
     scores.push(score4);
     pb.inc(1);
     
@@ -49,23 +49,30 @@ pub async fn run_storage_benchmark(config: &StorageConfig) -> f64 {
     avg_score
 }
 
-fn test_sequential_write(file_path: &PathBuf,config:&StorageConfig) -> f64 {
-    let size = 500_000_000;
-    let buffer = vec![0u8; 1_000_000];
+fn test_sequential_write(file_path: &PathBuf, config: &StorageConfig) -> f64 {
+    let size_bytes = config.sequential_write_size;
+    let buffer_size = config.sequential_write_buffer_size;
+    let buffer = vec![0u8; buffer_size];
+    
     let mut file = File::create(file_path).unwrap();
     let start = Instant::now();
-    for _ in 0..(size / buffer.len()) {
+    
+    let writes_needed = (size_bytes + buffer_size - 1) / buffer_size;
+    for _ in 0..writes_needed {
         file.write_all(&buffer).unwrap();
     }
     file.sync_all().unwrap();
+    
     let elapsed = start.elapsed().as_secs_f64();
-    let speed = size as f64 / elapsed / 1_000_000.0;
+    let speed = size_bytes as f64 / elapsed / 1_000_000.0; // MB/s
     speed / config.sequential_write_ref
 }
 
-fn test_sequential_read(file_path: &PathBuf,config:&StorageConfig) -> f64 {
+fn test_sequential_read(file_path: &PathBuf, config: &StorageConfig) -> f64 {
     let mut file = File::open(file_path).unwrap();
-    let mut buffer = vec![0u8; 1_000_000];
+    let buffer_size = config.sequential_write_buffer_size;
+    let mut buffer = vec![0u8; buffer_size];
+    
     let start = Instant::now();
     loop {
         match file.read(&mut buffer) {
@@ -74,47 +81,57 @@ fn test_sequential_read(file_path: &PathBuf,config:&StorageConfig) -> f64 {
             Err(_) => break,
         }
     }
+    
     let elapsed = start.elapsed().as_secs_f64();
     let file_size = file.metadata().unwrap().len() as f64;
-    let speed = file_size / elapsed / 1_000_000.0;
-    speed /config.sequential_read_ref
+    let speed = file_size / elapsed / 1_000_000.0; // MB/s
+    speed / config.sequential_read_ref
 }
 
-fn test_random_write(file_path: &PathBuf,config:&StorageConfig) -> f64 {
+fn test_random_write(file_path: &PathBuf, config: &StorageConfig) -> f64 {
     let mut file = std::fs::OpenOptions::new()
         .write(true)
         .open(file_path)
         .unwrap();
+    
     let file_size = file.metadata().unwrap().len();
-    let block_size = 4096;
-    let num_operations = 10000;
+    let block_size = config.random_write_block_size;
+    let num_operations = config.random_write_operations;
     let mut rng = rand::thread_rng();
     let buffer = vec![0u8; block_size];
+    
     let start = Instant::now();
     for _ in 0..num_operations {
-        let offset = rng.gen_range(0..(file_size / block_size as u64)) * block_size as u64;
+        let max_offset = file_size / block_size as u64;
+        if max_offset == 0 { break; }
+        let offset = rng.gen_range(0..max_offset) * block_size as u64;
         file.seek(SeekFrom::Start(offset)).unwrap();
         file.write_all(&buffer).unwrap();
     }
     file.sync_all().unwrap();
+    
     let elapsed = start.elapsed().as_secs_f64();
     let iops = num_operations as f64 / elapsed;
     iops / config.random_write_ref
 }
 
-fn test_random_read(file_path: &PathBuf,config:&StorageConfig) -> f64 {
+fn test_random_read(file_path: &PathBuf, config: &StorageConfig) -> f64 {
     let mut file = File::open(file_path).unwrap();
     let file_size = file.metadata().unwrap().len();
-    let block_size = 4096;
-    let num_operations = 10000;
+    let block_size = config.random_read_block_size;
+    let num_operations = config.random_read_operations;
     let mut rng = rand::thread_rng();
     let mut buffer = vec![0u8; block_size];
+    
     let start = Instant::now();
     for _ in 0..num_operations {
-        let offset = rng.gen_range(0..(file_size / block_size as u64)) * block_size as u64;
+        let max_offset = file_size / block_size as u64;
+        if max_offset == 0 { break; }
+        let offset = rng.gen_range(0..max_offset) * block_size as u64;
         file.seek(SeekFrom::Start(offset)).unwrap();
         let _ = file.read(&mut buffer).unwrap();
     }
+    
     let elapsed = start.elapsed().as_secs_f64();
     let iops = num_operations as f64 / elapsed;
     iops / config.random_read_ref

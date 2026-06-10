@@ -18,22 +18,22 @@ pub fn run_memory_benchmark(total_ram: u64, config: &MemoryConfig) -> f64 {
     let mut scores = Vec::new();
     
     pb.set_message("Sequential read/write...");
-    let score1 = test_sequential_access(&config);
+    let score1 = test_sequential_access(config);
     scores.push(score1);
     pb.inc(1);
     
     pb.set_message("Random read/write...");
-    let score2 = test_random_access(&config);
+    let score2 = test_random_access(config);
     scores.push(score2);
     pb.inc(1);
     
     pb.set_message("Memory bandwidth...");
-    let score3 = test_memory_bandwidth(&config);
+    let score3 = test_memory_bandwidth(config);
     scores.push(score3);
     pb.inc(1);
     
     pb.set_message("Latency test...");
-    let score4 = test_latency(&config);
+    let score4 = test_latency(config);
     scores.push(score4);
     pb.inc(1);
     
@@ -49,7 +49,7 @@ pub fn run_memory_benchmark(total_ram: u64, config: &MemoryConfig) -> f64 {
     avg_score
 }
 
-fn test_sequential_access(config:&MemoryConfig) -> f64 {
+fn test_sequential_access(config: &MemoryConfig) -> f64 {
     let size = config.sequential_access_test_size;
     let layout = Layout::array::<u64>(size).unwrap();
     let ptr = unsafe { alloc(layout) as *mut u64 };
@@ -75,6 +75,8 @@ fn test_sequential_access(config:&MemoryConfig) -> f64 {
 
 fn test_random_access(config: &MemoryConfig) -> f64 {
     let size = config.random_access_test_size;
+    let ops = config.random_access_operations;
+    
     let layout = Layout::array::<u64>(size).unwrap();
     let ptr = unsafe { alloc(layout) as *mut u64 };
     unsafe {
@@ -82,10 +84,12 @@ fn test_random_access(config: &MemoryConfig) -> f64 {
             *ptr.add(i) = i as u64;
         }
     }
+    
     let mut rng = rand::thread_rng();
-    let indices: Vec<usize> = (0..1_000_000)
+    let indices: Vec<usize> = (0..ops)
         .map(|_| rng.gen_range(0..size))
         .collect();
+    
     let start = Instant::now();
     let mut sum: u64 = 0;
     for &idx in &indices {
@@ -101,19 +105,22 @@ fn test_random_access(config: &MemoryConfig) -> f64 {
     ops_per_sec / 1_000_000.0 / config.random_access_ref
 }
 
-fn test_memory_bandwidth(config:&MemoryConfig) -> f64 {
+fn test_memory_bandwidth(config: &MemoryConfig) -> f64 {
     let size = config.memory_bandwidth_test_size;
+    let iterations = config.memory_bandwidth_iterations;
+    
     let mut src = vec![0u64; size];
     let mut dst = vec![0u64; size];
     for i in 0..size {
         src[i] = i as u64;
     }
+    
     let start = Instant::now();
-    for _ in 0..5 {
+    for _ in 0..iterations {
         dst.copy_from_slice(&src);
     }
     let elapsed = start.elapsed().as_secs_f64();
-    let total_bytes = (size * std::mem::size_of::<u64>() * 5) as f64;
+    let total_bytes = (size * std::mem::size_of::<u64>() * iterations) as f64;
     let bandwidth = total_bytes / elapsed / 1_000_000_000.0;
     std::hint::black_box(&dst);
     bandwidth / config.memory_bandwidth_ref
@@ -121,25 +128,32 @@ fn test_memory_bandwidth(config:&MemoryConfig) -> f64 {
 
 fn test_latency(config: &MemoryConfig) -> f64 {
     let size = config.latency_test_size;
+    let operations = config.latency_operations;
+    
     let mut data: Vec<(u64, usize)> = vec![(0, 0); size];
     let mut order: Vec<usize> = (0..size).collect();
+    
+    // Fisher-Yates shuffle
     for i in (1..size).rev() {
         let j = rand::thread_rng().gen_range(0..=i);
         order.swap(i, j);
     }
+    
+    // 创建随机链表
     for i in 0..size {
         let next = if i < size - 1 { order[i + 1] } else { order[0] };
         data[order[i]] = (0, next);
     }
+    
     let start = Instant::now();
     let mut current = order[0];
     let mut sum: u64 = 0;
-    for _ in 0..5_000_000 {
+    for _ in 0..operations {
         sum = sum.wrapping_add(data[current].0);
         current = data[current].1;
     }
     std::hint::black_box(sum);
     let elapsed = start.elapsed().as_secs_f64();
-    let latency_ns = elapsed * 1_000_000_000.0 / 5_000_000.0;
+    let latency_ns = elapsed * 1_000_000_000.0 / operations as f64;
     (1000.0 / latency_ns) / config.latency_ref
 }
