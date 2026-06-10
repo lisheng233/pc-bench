@@ -26,6 +26,10 @@ Features / 功能特性
  Cross-platform / 跨平台: Supports Windows, Linux, macOS (ARM64/x86_64)
 支持 Windows、Linux、macOS（ARM64/x86_64）
 
+Android users can run it on the terminal of MT Manager (SDK28 version) (GPU testing cannot be performed on Termux).
+URL: https://mt2.cn/
+安卓用户可以在mt管理器(SDK28的版本)的终端上运行（termux上无法进行GPU测试）
+
  Configurable  /  可配置: Adjust per-item weights, reference scores and rating tiers via benchmark_config.toml
 通过 benchmark_config.toml 调整每项权重、参考分数和评级等
 
