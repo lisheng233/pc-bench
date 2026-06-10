@@ -33,9 +33,10 @@ random_read_ref = 100.0
 [gpu]
 force_test_vgpu = false
 reference_score = 10000.0
-iteration = 64
-vec_ref = 5000.0
-vram_bandwidth_ref = 200.0
+iteration = 16
+vec_num=2000000
+vec_ref = 3000.0
+vram_bandwidth_ref = 64.0
 vram_bandwidth_test_size_mb = 128
 vram_capacity_weight = 0.3
 
