@@ -7,7 +7,7 @@ pub async fn run_gpu_benchmark(config: &GpuConfig) -> f64 {
     println!("  Enumerating GPUs...");
 
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::all(),
+        backends: wgpu::Backends::PRIMARY,
         ..Default::default()
     });
 
@@ -170,8 +170,8 @@ async fn run_compute_benchmark(device: &wgpu::Device, queue: &wgpu::Queue, confi
         source: wgpu::ShaderSource::Wgsl(shader_source.into()),
     });
 
-    const NUM_VEC4: usize = 5_000_000;
-    let buffer_size = (NUM_VEC4 * std::mem::size_of::<[f32; 4]>()) as u64;
+    let num_vec4: usize = config.vec_num;
+    let buffer_size = (num_vec4 * std::mem::size_of::<[f32; 4]>()) as u64;
 
     let buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Benchmark Buffer"),
@@ -182,7 +182,7 @@ async fn run_compute_benchmark(device: &wgpu::Device, queue: &wgpu::Queue, confi
         mapped_at_creation: false,
     });
 
-    let mut initial_data = vec![[0.0f32; 4]; NUM_VEC4];
+    let mut initial_data = vec![[0.0f32; 4]; num_vec4];
     for (i, vec4) in initial_data.iter_mut().enumerate() {
         for comp in 0..4 {
             vec4[comp] = ((i * 4 + comp) as f32).sin();
@@ -245,7 +245,7 @@ async fn run_compute_benchmark(device: &wgpu::Device, queue: &wgpu::Queue, confi
             compute_pass.set_pipeline(&compute_pipeline);
             compute_pass.set_bind_group(0, &bind_group, &[]);
             let workgroup_size = 256u32;
-            let workgroups = ((NUM_VEC4 as u32) + workgroup_size - 1) / workgroup_size;
+            let workgroups = ((num_vec4 as u32) + workgroup_size - 1) / workgroup_size;
             compute_pass.dispatch_workgroups(workgroups, 1, 1);
         }
         queue.submit(Some(encoder.finish()));
@@ -267,7 +267,7 @@ async fn run_compute_benchmark(device: &wgpu::Device, queue: &wgpu::Queue, confi
             compute_pass.set_pipeline(&compute_pipeline);
             compute_pass.set_bind_group(0, &bind_group, &[]);
             let workgroup_size = 256u32;
-            let workgroups = ((NUM_VEC4 as u32) + workgroup_size - 1) / workgroup_size;
+            let workgroups = ((num_vec4 as u32) + workgroup_size - 1) / workgroup_size;
             compute_pass.dispatch_workgroups(workgroups, 1, 1);
         }
         queue.submit(Some(compute_encoder.finish()));
@@ -280,13 +280,13 @@ async fn run_compute_benchmark(device: &wgpu::Device, queue: &wgpu::Queue, confi
     let ops_per_vec4_per_loop = 20.0;
     let total_loops = 2500.0;
     let ops_per_vec4 = ops_per_vec4_per_loop * total_loops;
-    let total_ops = NUM_VEC4 as f64 * ops_per_vec4;
+    let total_ops = num_vec4 as f64 * ops_per_vec4;
     let flops_per_second = total_ops / avg_time_per_iter;
     let gflops = flops_per_second / 1_000_000_000.0;
 
     let compute_score = (gflops / config.vec_ref) * config.reference_score;
     println!("  GPU Performance: {:.2} GFLOPS", gflops);
-    println!("  Data size: {} vectors ({:.2} MB)", NUM_VEC4, buffer_size as f64 / 1024.0 / 1024.0);
+    println!("  Data size: {} vectors ({:.2} MB)", num_vec4, buffer_size as f64 / 1024.0 / 1024.0);
     println!("  Operations: {:.2} billion per iteration", total_ops / 1_000_000_000.0);
 
     compute_score

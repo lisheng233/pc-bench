@@ -63,6 +63,7 @@ pub struct GpuConfig {
     pub force_test_vgpu: bool,
     pub reference_score: f64,
     pub iteration: u32,
+    pub vec_num: usize,
     pub vec_ref: f64,
     pub vram_bandwidth_ref: f64,
     pub vram_bandwidth_test_size_mb: usize,
@@ -157,9 +158,10 @@ impl Default for GpuConfig {
         Self { 
             force_test_vgpu: false,
             reference_score: 10000.0 ,
-            iteration: 64,
-            vec_ref:5000.0,
-            vram_bandwidth_ref: 200.0,
+            iteration: 16,
+            vec_num: 2000000,
+            vec_ref:3000.0,
+            vram_bandwidth_ref: 64.0,
             vram_bandwidth_test_size_mb: 128,
             vram_capacity_weight: 0.3,
             }
