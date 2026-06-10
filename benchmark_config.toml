@@ -7,6 +7,7 @@ gpu_weight = 0.1
 [cpu]
 calc_average_cpu_score = true
 num_threads_ref = 4
+
 integer_ref = 240.0
 float_ref = 60.0
 prime_ref = 6000.0
@@ -17,25 +18,42 @@ reference_score = 10000.0
 [memory]
 sequential_access_ref = 0.004
 sequential_access_test_size = 100000000
+
 random_access_ref = 0.01
 random_access_test_size = 10000000
+random_access_operations = 1000000
+
 memory_bandwidth_ref = 0.005
 memory_bandwidth_test_size = 50000000
+memory_bandwidth_iterations = 5
+
 latency_ref = 0.002
 latency_test_size = 10000000
+latency_operations = 5000000
 
 [storage]
 sequential_write_ref = 0.2
+sequential_write_size = 500000000
+sequential_write_buffer_size = 1024000
+
 sequential_read_ref = 0.8
+
 random_write_ref = 10.0
+random_write_block_size = 4096
+random_write_operations = 10000
+
 random_read_ref = 100.0
+random_read_block_size = 4096
+random_read_operations = 10000
 
 [gpu]
 force_test_vgpu = false
 reference_score = 10000.0
+
 iteration = 16
 vec_num=2000000
 vec_ref = 3000.0
+
 vram_bandwidth_ref = 64.0
 vram_bandwidth_test_size_mb = 128
 vram_capacity_weight = 0.3
